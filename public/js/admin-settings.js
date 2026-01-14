@@ -1222,11 +1222,17 @@ const initSettings = () => {
 
     let systemPrompt, userPrompt;
     if (generateName) {
-      systemPrompt = "You are a helpful assistant. You must response with valid JSON.";
-      userPrompt = `分析链接：'${url}'。请生成一个简短的网站名称（name，不超过10字）和中文简介（description，不超过30字）。请严格只返回 JSON 格式，例如：{"name": "名称", "description": "简介"}。`;
+      systemPrompt = "You are a helpful assistant with web browsing capability. You must response with valid JSON.";
+      userPrompt = `请访问并分析这个网页：${url}
+根据网页的实际标题、meta描述和内容，生成一个简短的网站名称（name，不超过10字）和中文简介（description，不超过30字）。
+如果无法访问网页，请根据URL推测生成。
+请严格只返回 JSON 格式，例如：{"name": "名称", "description": "简介"}。`;
     } else {
-      systemPrompt = "You are a helpful assistant that generates concise and accurate descriptions for bookmarks.";
-      userPrompt = `为以下书签生成一个简洁的中文描述（不超过30字）。请直接返回描述内容，不要包含"书签名称"、"描述"等前缀，也不要使用"标题: 描述"的格式。书签名称：'${name}'，链接：'${url}'`;
+      systemPrompt = "You are a helpful assistant with web browsing capability that generates concise and accurate descriptions for bookmarks.";
+      userPrompt = `请访问并分析这个网页：${url}
+根据网页的实际标题、meta描述和内容，生成一个简洁的中文描述（不超过30字）。
+如果无法访问网页，请根据书签名称'${name}'和URL推测生成。
+请直接返回描述内容，不要包含"书签名称"、"描述"等前缀。`;
     }
 
     try {
