@@ -60,6 +60,7 @@ export async function onRequestPost(context) {
             body: JSON.stringify({
                 model: model || 'gpt-3.5-turbo',
                 messages: messages,
+                stream: false,
                 temperature: 0.7
             })
         });
