@@ -1,55 +1,64 @@
-export async function onRequest(context) {
-    const { request } = context;
-    const url = new URL(request.url);
-    const params = url.searchParams;
-    const source = params.get('source'); // '360' or 'bing'
+
+import { jsonResponse, errorResponse } from '../_middleware';
+
+export async function onRequestGet(context) {
+  const { request } = context;
+  const url = new URL(request.url);
+  const source = url.searchParams.get('source') || 'bing';
+  const cid = url.searchParams.get('cid') || '36';
+  const country = url.searchParams.get('country') || '';
+  const indexStr = url.searchParams.get('index') || '-1';
+  let currentIndex = parseInt(indexStr);
+  if (isNaN(currentIndex)) currentIndex = -1;
+
+  try {
+    let targetUrl = '';
+    let nextIndex = 0;
 
     if (source === '360') {
-        const action = params.get('action'); // 'categories' or 'list'
-        
-        if (action === 'categories') {
-            const apiUrl = 'http://cdn.apc.360.cn/index.php?c=WallPaper&a=getAllCategoriesV2&from=360chrome';
-            return fetchAndProxy(apiUrl);
-        } else if (action === 'list') {
-            const cid = params.get('cid') || '36';
-            const start = params.get('start') || '0';
-            const count = params.get('count') || '8';
-            const apiUrl = `http://cdn.apc.360.cn/index.php?c=WallPaper&a=getAppsByCategory&from=360chrome&cid=${cid}&start=${start}&count=${count}`;
-            return fetchAndProxy(apiUrl);
+      const apiUrl = `http://cdn.apc.360.cn/index.php?c=WallPaper&a=getAppsByCategory&from=360chrome&cid=${cid}&start=0&count=8`;
+      const res = await fetch(apiUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.errno === "0" && json.data && json.data.length > 0) {
+          nextIndex = (currentIndex + 1) % json.data.length;
+          const targetItem = json.data[nextIndex];
+          if (targetItem.url) {
+            targetUrl = targetItem.url.replace('http://', 'https://');
+          }
         }
-    } else if (source === 'bing') {
-        // Bing / Spotlight 壁纸
-        const country = params.get('country') || '';
-        let bingUrl = '';
-        if (country === 'spotlight') {
-            bingUrl = 'https://peapix.com/spotlight/feed?n=7';
-        } else {
-            bingUrl = `https://peapix.com/bing/feed?n=7&country=${country}`;
+      }
+    } else {
+      // Default to Bing
+      let bingUrl = '';
+      if (country === 'spotlight') {
+        bingUrl = 'https://peapix.com/spotlight/feed?n=7';
+      } else {
+        bingUrl = `https://peapix.com/bing/feed?n=7&country=${country}`;
+      }
+      const res = await fetch(bingUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          nextIndex = (currentIndex + 1) % data.length;
+          const targetItem = data[nextIndex];
+          targetUrl = targetItem.fullUrl || targetItem.url;
         }
-        return fetchAndProxy(bingUrl);
+      }
     }
 
-    return new Response(JSON.stringify({ code: 400, message: 'Invalid request' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-    });
-}
-
-async function fetchAndProxy(url) {
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        return new Response(JSON.stringify({ code: 200, data: data }), {
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*' // Or restrictive if needed
-            }
-        });
-    } catch (error) {
-        return new Response(JSON.stringify({ code: 500, message: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
+    if (targetUrl) {
+      return jsonResponse({
+        code: 200,
+        data: {
+          url: targetUrl,
+          index: nextIndex
+        }
+      });
+    } else {
+      return errorResponse('Failed to fetch wallpaper', 500);
     }
+  } catch (e) {
+    return errorResponse(`Error: ${e.message}`, 500);
+  }
 }
